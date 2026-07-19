@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\OfflineFileTransfer.Core\OfflineFileTransfer.Core.csproj" />
+    <ProjectReference Include="..\OfflineFileTransfer.WindowsDevices\OfflineFileTransfer.WindowsDevices.csproj" />
+    <ProjectReference Include="..\OfflineFileTransfer.IosNative\OfflineFileTransfer.IosNative.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+
+</Project>

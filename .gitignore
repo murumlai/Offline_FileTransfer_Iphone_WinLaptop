@@ -1,0 +1,49 @@
+## .NET build outputs
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Bb]uild/
+[Pp]ublish/
+artifacts/
+
+## Visual Studio / Rider
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.idea/
+
+## Test results
+[Tt]est[Rr]esult*/
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+coverage*.json
+coverage*.xml
+coverage*.info
+
+## NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+!packages/build/
+
+## Native build artifacts
+*.o
+*.obj
+*.dll
+*.exe
+*.pdb
+!**/runtimes/**/*.dll
+
+## OS files
+Thumbs.db
+Desktop.ini
+.DS_Store

@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/OfflineFileTransfer.App/OfflineFileTransfer.App.csproj" />
+    <Project Path="src/OfflineFileTransfer.Core/OfflineFileTransfer.Core.csproj" />
+    <Project Path="src/OfflineFileTransfer.IosNative/OfflineFileTransfer.IosNative.csproj" />
+    <Project Path="src/OfflineFileTransfer.WindowsDevices/OfflineFileTransfer.WindowsDevices.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/OfflineFileTransfer.Core.Tests/OfflineFileTransfer.Core.Tests.csproj" />
+  </Folder>
+</Solution>
