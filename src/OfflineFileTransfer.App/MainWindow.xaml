@@ -4,9 +4,227 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:OfflineFileTransfer.App"
+        xmlns:vm="clr-namespace:OfflineFileTransfer.App.ViewModels"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
-    <Grid>
+        Title="Offline iPhone USB Transfer" Height="720" Width="1180"
+        MinHeight="560" MinWidth="960">
+    <Window.Resources>
+        <local:StatusToBrushConverter x:Key="StatusToBrush" />
+        <Style TargetType="TextBlock" x:Key="Heading">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,0,0,6" />
+        </Style>
+    </Window.Resources>
 
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Header: device status + actions -->
+        <Border Grid.Row="0" Padding="10" Margin="0,0,0,10"
+                Background="#F3F4F6" CornerRadius="6">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="Device" Style="{StaticResource Heading}" />
+                    <TextBlock Text="{Binding DeviceStatus}" TextWrapping="Wrap" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Content="Refresh" Command="{Binding RefreshCommand}"
+                            Width="90" Margin="4,0" Padding="6,4" />
+                    <Button Content="Diagnostics" Command="{Binding RunDiagnosticsCommand}"
+                            Width="100" Margin="4,0" Padding="6,4" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Body -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="240" />
+                <ColumnDefinition Width="260" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Sources + folders -->
+            <DockPanel Grid.Column="0" Margin="0,0,10,0">
+                <TextBlock DockPanel.Dock="Top" Text="Sources" Style="{StaticResource Heading}" />
+                <Button DockPanel.Dock="Top" Content="Open source"
+                        Command="{Binding OpenSourceCommand}" Margin="0,0,0,6" Padding="6,4" />
+                <ListBox DockPanel.Dock="Top" Height="120"
+                         ItemsSource="{Binding Sources}"
+                         SelectedItem="{Binding SelectedSource}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate DataType="{x:Type vm:SourceViewModel}">
+                            <StackPanel>
+                                <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding StatusText}" FontSize="11"
+                                           Foreground="Gray" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                <TextBlock DockPanel.Dock="Top" Text="Folders" Style="{StaticResource Heading}"
+                           Margin="0,10,0,6" />
+                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,6">
+                    <Button Content="Up" Command="{Binding GoUpCommand}" Width="60" Padding="6,4" />
+                    <Button Content="Open" Command="{Binding OpenFolderCommand}"
+                            Width="60" Margin="6,0,0,0" Padding="6,4" />
+                </StackPanel>
+                <TextBlock DockPanel.Dock="Top" Text="{Binding CurrentPathDisplay}"
+                           FontSize="11" Foreground="Gray" TextWrapping="Wrap" Margin="0,0,0,4" />
+                <ListBox ItemsSource="{Binding Folders}"
+                         SelectedItem="{Binding SelectedFolder}"
+                         DisplayMemberPath="Name" />
+            </DockPanel>
+
+            <!-- Filters + diagnostics -->
+            <DockPanel Grid.Column="1" Margin="0,0,10,0">
+                <TextBlock DockPanel.Dock="Top" Text="Filters" Style="{StaticResource Heading}" />
+                <StackPanel DockPanel.Dock="Top">
+                    <CheckBox Content="Images" IsChecked="{Binding FilterImages}" Margin="0,2" />
+                    <CheckBox Content="Videos" IsChecked="{Binding FilterVideos}" Margin="0,2" />
+                    <CheckBox Content="Audio" IsChecked="{Binding FilterAudio}" Margin="0,2" />
+                    <CheckBox Content="Documents" IsChecked="{Binding FilterDocuments}" Margin="0,2" />
+                    <CheckBox Content="Archives" IsChecked="{Binding FilterArchives}" Margin="0,2" />
+
+                    <TextBlock Text="Custom extensions (comma separated)" Margin="0,8,0,2" FontSize="11" />
+                    <TextBox Text="{Binding CustomExtensions, UpdateSourceTrigger=PropertyChanged}" />
+
+                    <TextBlock Text="Search filename" Margin="0,8,0,2" FontSize="11" />
+                    <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" />
+
+                    <TextBlock Text="Size range" Margin="0,8,0,2" FontSize="11" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox Grid.Column="0" Margin="0,0,4,0"
+                                 Text="{Binding MinSize, TargetNullValue=''}" ToolTip="Min" />
+                        <TextBox Grid.Column="1" Margin="0,0,4,0"
+                                 Text="{Binding MaxSize, TargetNullValue=''}" ToolTip="Max" />
+                        <ComboBox Grid.Column="2" Width="60"
+                                  ItemsSource="{Binding SizeUnits}"
+                                  SelectedItem="{Binding SelectedSizeUnit}" />
+                    </Grid>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                        <Button Content="Apply" Command="{Binding ApplyFilterCommand}"
+                                Width="80" Padding="6,4" />
+                        <Button Content="Clear" Command="{Binding ClearFilterCommand}"
+                                Width="80" Margin="6,0,0,0" Padding="6,4" />
+                    </StackPanel>
+                </StackPanel>
+
+                <TextBlock DockPanel.Dock="Top" Text="Diagnostics" Style="{StaticResource Heading}"
+                           Margin="0,14,0,6" />
+                <ListBox ItemsSource="{Binding Diagnostics}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Margin="0,2">
+                                <StackPanel Orientation="Horizontal">
+                                    <Ellipse Width="10" Height="10" Margin="0,0,6,0"
+                                             Fill="{Binding Status, Converter={StaticResource StatusToBrush}}"
+                                             VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+                                </StackPanel>
+                                <TextBlock Text="{Binding Detail}" FontSize="11"
+                                           Foreground="Gray" TextWrapping="Wrap" Margin="16,0,0,0" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </DockPanel>
+
+            <!-- File list -->
+            <DockPanel Grid.Column="2">
+                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,6">
+                    <TextBlock Text="Files" Style="{StaticResource Heading}" VerticalAlignment="Center" />
+                    <Button Content="Select all" Command="{Binding SelectAllCommand}"
+                            Margin="12,0,0,0" Padding="6,2" />
+                    <Button Content="Select none" Command="{Binding SelectNoneCommand}"
+                            Margin="6,0,0,0" Padding="6,2" />
+                </StackPanel>
+                <DataGrid ItemsSource="{Binding Files}" AutoGenerateColumns="False"
+                          CanUserAddRows="False" CanUserDeleteRows="False"
+                          GridLinesVisibility="Horizontal" HeadersVisibility="Column"
+                          IsReadOnly="False" SelectionMode="Extended">
+                    <DataGrid.Columns>
+                        <DataGridCheckBoxColumn Header="" Width="34"
+                                                Binding="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged}" />
+                        <DataGridTextColumn Header="Name" Width="*" IsReadOnly="True"
+                                            Binding="{Binding Name}" />
+                        <DataGridTextColumn Header="Type" Width="90" IsReadOnly="True"
+                                            Binding="{Binding Category}" />
+                        <DataGridTextColumn Header="Size" Width="90" IsReadOnly="True"
+                                            Binding="{Binding SizeDisplay}" />
+                        <DataGridTextColumn Header="Modified" Width="130" IsReadOnly="True"
+                                            Binding="{Binding ModifiedDisplay}" />
+                        <DataGridTextColumn Header="Source" Width="110" IsReadOnly="True"
+                                            Binding="{Binding SourceDisplay}" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </DockPanel>
+        </Grid>
+
+        <!-- Footer: destination + transfer -->
+        <Border Grid.Row="2" Padding="10" Margin="0,10,0,0"
+                Background="#F3F4F6" CornerRadius="6">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Button Grid.Column="0" Content="Destination…"
+                            Command="{Binding PickDestinationCommand}" Padding="8,4" />
+                    <TextBox Grid.Column="1" Margin="8,0" VerticalContentAlignment="Center"
+                             IsReadOnly="True" Text="{Binding DestinationFolder}" />
+                    <CheckBox Grid.Column="2" Content="Preserve folders" VerticalAlignment="Center"
+                              Margin="6,0" IsChecked="{Binding PreserveStructure}" />
+                    <TextBlock Grid.Column="3" Text="Duplicates:" VerticalAlignment="Center" Margin="6,0,4,0" />
+                    <ComboBox Grid.Column="4" Width="120" VerticalAlignment="Center"
+                              ItemsSource="{Binding DuplicatePolicies}"
+                              SelectedItem="{Binding DuplicatePolicy}" />
+                </Grid>
+                <Grid Grid.Row="1" Margin="0,10,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
+                        <ProgressBar Height="16" Minimum="0" Maximum="100"
+                                     Value="{Binding TransferProgress}" />
+                        <TextBlock Text="{Binding StatusMessage}" Margin="0,4,0,0" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button Content="Download selected"
+                                Command="{Binding DownloadSelectedCommand}"
+                                Margin="8,0,0,0" Padding="10,6" />
+                        <Button Content="Download all filtered"
+                                Command="{Binding DownloadFilteredCommand}"
+                                Margin="8,0,0,0" Padding="10,6" />
+                        <Button Content="Cancel" Command="{Binding CancelCommand}"
+                                Margin="8,0,0,0" Padding="10,6" />
+                    </StackPanel>
+                </Grid>
+            </Grid>
+        </Border>
     </Grid>
 </Window>

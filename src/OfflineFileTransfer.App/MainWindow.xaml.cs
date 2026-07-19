@@ -1,23 +1,53 @@
-﻿using System.Text;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
+﻿using System.Windows;
+using OfflineFileTransfer.App.Services;
+using OfflineFileTransfer.App.ViewModels;
+using OfflineFileTransfer.Core.Models;
+using OfflineFileTransfer.Core.Providers;
+using OfflineFileTransfer.Core.Transfers;
+using OfflineFileTransfer.IosNative;
+using OfflineFileTransfer.WindowsDevices;
 
 namespace OfflineFileTransfer.App;
 
 /// <summary>
-/// Interaction logic for MainWindow.xaml
+/// Interaction logic for MainWindow.xaml. Acts as the composition root.
 /// </summary>
 public partial class MainWindow : Window
 {
     public MainWindow()
     {
         InitializeComponent();
+
+        var registry = new ProviderRegistry();
+        var deviceManager = new WpdDeviceManager();
+        var diagnostics = new WpdDiagnosticsService(deviceManager);
+        var transferService = new FileTransferService(registry.Resolve);
+
+        var viewModel = new MainViewModel(
+            deviceManager,
+            diagnostics,
+            BuildProviders,
+            transferService,
+            FolderPicker.Pick,
+            providers => registry.Set(providers));
+
+        DataContext = viewModel;
+
+        Loaded += async (_, _) => await viewModel.RefreshAsync();
+    }
+
+    private static IReadOnlyList<IPhoneFileProvider> BuildProviders(DeviceInfo device)
+    {
+        var providers = new List<IPhoneFileProvider>
+        {
+            new WpdMediaProvider(device.Name),
+        };
+
+        if (IosFileSharingProvider.BridgeAvailable)
+        {
+            providers.Add(new IosFileSharingProvider());
+        }
+
+        return providers;
     }
 }
