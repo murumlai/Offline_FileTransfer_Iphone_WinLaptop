@@ -47,7 +47,7 @@ public sealed class MainViewModel : ObservableObject
         OpenSourceCommand = new AsyncRelayCommand(OpenSelectedSourceAsync, () => SelectedSource is { IsAvailable: true } && !IsBusy);
         OpenFolderCommand = new AsyncRelayCommand(OpenSelectedFolderAsync, () => SelectedFolder is not null && !IsBusy);
         GoUpCommand = new AsyncRelayCommand(GoUpAsync, () => _pathStack.Count > 0 && !IsBusy);
-        ApplyFilterCommand = new RelayCommand(ApplyFilter, () => !IsBusy);
+        ApplyFilterCommand = new AsyncRelayCommand(ApplyFilterAsync, () => !IsBusy);
         ClearFilterCommand = new RelayCommand(ClearFilter, () => !IsBusy);
         SelectAllCommand = new RelayCommand(() => SetSelection(true));
         SelectNoneCommand = new RelayCommand(() => SetSelection(false));
@@ -67,7 +67,7 @@ public sealed class MainViewModel : ObservableObject
     public AsyncRelayCommand OpenSourceCommand { get; }
     public AsyncRelayCommand OpenFolderCommand { get; }
     public AsyncRelayCommand GoUpCommand { get; }
-    public RelayCommand ApplyFilterCommand { get; }
+    public AsyncRelayCommand ApplyFilterCommand { get; }
     public RelayCommand ClearFilterCommand { get; }
     public RelayCommand SelectAllCommand { get; }
     public RelayCommand SelectNoneCommand { get; }
@@ -320,6 +320,70 @@ public sealed class MainViewModel : ObservableObject
         }
 
         RaiseCommandStates();
+    }
+
+    /// <summary>
+    /// Apply the filter. With no filter set, shows the current folder. When any filter is
+    /// active (e.g. a size range), recursively walks every folder in the selected source and
+    /// lists all matching files.
+    /// </summary>
+    private async Task ApplyFilterAsync()
+    {
+        var filter = BuildFilter();
+        if (filter.IsEmpty)
+        {
+            ApplyFilter();
+            return;
+        }
+
+        var source = SelectedSource is { IsAvailable: true }
+            ? SelectedSource
+            : Sources.FirstOrDefault(s => s.IsAvailable);
+        if (source is null)
+        {
+            ApplyFilter();
+            return;
+        }
+
+        await RunGuarded(async ct =>
+        {
+            StatusMessage = "Searching all folders\u2026";
+            Folders.Clear();
+            Files.Clear();
+            _currentFolderFiles.Clear();
+            CurrentPathDisplay = "(search results across all folders)";
+
+            var found = 0;
+            var scanned = 0;
+            var pending = new Stack<string>();
+            pending.Push(string.Empty);
+
+            while (pending.Count > 0)
+            {
+                ct.ThrowIfCancellationRequested();
+                var current = pending.Pop();
+                scanned++;
+
+                await foreach (var item in source.Provider.EnumerateAsync(current, ct).ConfigureAwait(true))
+                {
+                    switch (item)
+                    {
+                        case RemoteFolderItem folder:
+                            pending.Push(folder.RemotePath);
+                            break;
+                        case RemoteFileItem file when filter.Matches(file):
+                            Files.Add(new FileItemViewModel(file));
+                            found++;
+                            break;
+                    }
+                }
+
+                StatusMessage = $"Searching\u2026 {found} match(es) in {scanned} folder(s) scanned.";
+            }
+
+            StatusMessage = $"Search complete. {found} match(es) across {scanned} folder(s).";
+            RaiseCommandStates();
+        }).ConfigureAwait(true);
     }
 
     private void ClearFilter()
