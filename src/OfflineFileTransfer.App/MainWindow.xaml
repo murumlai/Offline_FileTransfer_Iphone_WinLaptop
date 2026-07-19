@@ -210,7 +210,7 @@
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0">
                         <ProgressBar Height="16" Minimum="0" Maximum="100"
-                                     Value="{Binding TransferProgress}" />
+                                     Value="{Binding TransferProgress, Mode=OneWay}" />
                         <TextBlock Text="{Binding StatusMessage}" Margin="0,4,0,0" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
