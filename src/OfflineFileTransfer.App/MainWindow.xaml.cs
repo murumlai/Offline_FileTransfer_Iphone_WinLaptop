@@ -23,6 +23,7 @@ public partial class MainWindow : Window
         var diagnostics = new WpdDiagnosticsService(deviceManager);
         var transferService = new FileTransferService(registry.Resolve);
         var hotspotUploadServer = new HotspotUploadServer();
+        var mobileHotspotService = new MobileHotspotService();
 
         var viewModel = new MainViewModel(
             deviceManager,
@@ -31,11 +32,16 @@ public partial class MainWindow : Window
             transferService,
             FolderPicker.Pick,
             providers => registry.Set(providers),
-            hotspotUploadServer);
+            hotspotUploadServer,
+            mobileHotspotService);
 
         DataContext = viewModel;
 
-        Loaded += async (_, _) => await viewModel.RefreshAsync();
+        Loaded += async (_, _) =>
+        {
+            await viewModel.RefreshAsync();
+            await viewModel.ConfigureAndStartDefaultHotspotAsync();
+        };
         Closed += async (_, _) => await viewModel.DisposeAsync();
     }
 

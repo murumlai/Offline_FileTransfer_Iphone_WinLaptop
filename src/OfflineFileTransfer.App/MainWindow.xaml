@@ -48,56 +48,102 @@
         <!-- Hotspot browser upload -->
         <Border Grid.Row="1" Padding="10" Margin="0,0,0,10"
                 Background="#EFF6FF" CornerRadius="6">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="2*" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
+            <DockPanel>
+                <!-- Windows Mobile Hotspot Network Configuration -->
+                <Grid DockPanel.Dock="Top" Margin="0,0,0,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="2*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="Windows Mobile Hotspot" Style="{StaticResource Heading}" />
+                        <TextBlock Text="Configure the network the iPhone will connect to before starting the upload server."
+                                   TextWrapping="Wrap" FontSize="11" Foreground="#6B7280" Margin="0,0,0,6" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="90" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Network name" VerticalAlignment="Center" FontSize="12" />
+                            <TextBox Grid.Column="1" Text="{Binding HotspotSsid, UpdateSourceTrigger=PropertyChanged}" />
+                        </Grid>
+                        <Grid Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="90" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Password" VerticalAlignment="Center" FontSize="12" />
+                            <TextBox Grid.Column="1" Text="{Binding HotspotPassphrase, UpdateSourceTrigger=PropertyChanged}" />
+                        </Grid>
+                        <TextBlock Text="{Binding HotspotNetworkStatus}" Margin="0,4,0,0"
+                                   Foreground="#1F2937" TextWrapping="Wrap" FontSize="11" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Vertical" VerticalAlignment="Center" Margin="12,0,0,0">
+                        <Button Content="Load config" Command="{Binding LoadHotspotConfigCommand}"
+                                Width="130" Padding="8,4" />
+                        <Button Content="Apply config" Command="{Binding ConfigureHotspotNetworkCommand}"
+                                Width="130" Padding="8,4" Margin="0,4,0,0" />
+                        <Button Content="Start hotspot" Command="{Binding StartHotspotNetworkCommand}"
+                                Width="130" Padding="8,4" Margin="0,4,0,0" />
+                        <Button Content="Stop hotspot" Command="{Binding StopHotspotNetworkCommand}"
+                                Width="130" Padding="8,4" Margin="0,4,0,0" />
+                    </StackPanel>
+                </Grid>
 
-                <StackPanel Grid.Column="0">
-                    <TextBlock Text="Hotspot browser upload" Style="{StaticResource Heading}" />
-                    <TextBlock Text="No USB detection is needed. Put both devices on the same hotspot, start the server, then open the URL in Safari on the iPhone."
-                               TextWrapping="Wrap" />
-                    <Grid Margin="0,6,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <Button Grid.Column="0" Content="Destination..."
-                                Command="{Binding PickDestinationCommand}" Padding="8,4" />
-                        <TextBox Grid.Column="1" Text="{Binding DestinationFolder, Mode=OneWay}"
-                                 IsReadOnly="True" Margin="8,0,0,0" VerticalContentAlignment="Center" />
-                    </Grid>
-                    <TextBox Text="{Binding HotspotPrimaryUrl, Mode=OneWay}" IsReadOnly="True"
-                             Margin="0,6,0,0" VerticalContentAlignment="Center" />
-                    <ItemsControl ItemsSource="{Binding HotspotUploadUrls}" Margin="0,4,0,0">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding}" FontSize="11" Foreground="#1D4ED8"
-                                           TextWrapping="Wrap" />
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                    <TextBlock Text="{Binding HotspotUploadStatus}" Margin="0,4,0,0"
-                               Foreground="#1F2937" TextWrapping="Wrap" />
-                </StackPanel>
+                <Separator DockPanel.Dock="Top" Margin="0,0,0,8" />
 
-                <StackPanel Grid.Column="1" Margin="12,0">
-                    <TextBlock Text="Received files" Style="{StaticResource Heading}" />
-                    <ListBox Height="82" ItemsSource="{Binding HotspotReceivedFiles}"
-                             DisplayMemberPath="FileName" />
-                </StackPanel>
+                <!-- Upload Server -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="2*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
 
-                <StackPanel Grid.Column="2" Orientation="Vertical" VerticalAlignment="Center">
-                    <Button Content="Start upload server"
-                            Command="{Binding StartHotspotUploadCommand}"
-                            Width="150" Padding="8,4" />
-                    <Button Content="Stop server"
-                            Command="{Binding StopHotspotUploadCommand}"
-                            Width="150" Margin="0,6,0,0" Padding="8,4" />
-                </StackPanel>
-            </Grid>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="Hotspot browser upload" Style="{StaticResource Heading}" />
+                        <TextBlock Text="No USB detection is needed. Put both devices on the same hotspot, start the server, then open the URL in Safari on the iPhone."
+                                   TextWrapping="Wrap" />
+                        <Grid Margin="0,6,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Button Grid.Column="0" Content="Destination..."
+                                    Command="{Binding PickDestinationCommand}" Padding="8,4" />
+                            <TextBox Grid.Column="1" Text="{Binding DestinationFolder, Mode=OneWay}"
+                                     IsReadOnly="True" Margin="8,0,0,0" VerticalContentAlignment="Center" />
+                        </Grid>
+                        <TextBox Text="{Binding HotspotPrimaryUrl, Mode=OneWay}" IsReadOnly="True"
+                                 Margin="0,6,0,0" VerticalContentAlignment="Center" />
+                        <ItemsControl ItemsSource="{Binding HotspotUploadUrls}" Margin="0,4,0,0">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding}" FontSize="11" Foreground="#1D4ED8"
+                                               TextWrapping="Wrap" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Text="{Binding HotspotUploadStatus}" Margin="0,4,0,0"
+                                   Foreground="#1F2937" TextWrapping="Wrap" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Margin="12,0">
+                        <TextBlock Text="Received files" Style="{StaticResource Heading}" />
+                        <ListBox Height="82" ItemsSource="{Binding HotspotReceivedFiles}"
+                                 DisplayMemberPath="FileName" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2" Orientation="Vertical" VerticalAlignment="Center">
+                        <Button Content="Start upload server"
+                                Command="{Binding StartHotspotUploadCommand}"
+                                Width="150" Padding="8,4" />
+                        <Button Content="Stop server"
+                                Command="{Binding StopHotspotUploadCommand}"
+                                Width="150" Margin="0,6,0,0" Padding="8,4" />
+                    </StackPanel>
+                </Grid>
+            </DockPanel>
         </Border>
 
         <!-- Body -->

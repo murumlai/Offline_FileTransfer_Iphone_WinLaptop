@@ -15,6 +15,9 @@ namespace OfflineFileTransfer.App.ViewModels;
 /// </summary>
 public sealed class MainViewModel : ObservableObject
 {
+    private const string DefaultHotspotSsid = "muru_file";
+    private const string DefaultHotspotPassphrase = "12345678";
+
     private readonly IDeviceManager _deviceManager;
     private readonly IDiagnosticsService _diagnosticsService;
     private readonly Func<DeviceInfo, IReadOnlyList<IPhoneFileProvider>> _providerFactory;
@@ -22,6 +25,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly Func<string?> _pickFolder;
     private readonly Action<IReadOnlyList<IPhoneFileProvider>> _onProvidersReady;
     private readonly HotspotUploadServer _hotspotUploadServer;
+    private readonly MobileHotspotService _mobileHotspotService;
     private readonly SynchronizationContext? _syncContext;
 
     private readonly List<RemoteFileItem> _currentFolderFiles = new();
@@ -38,7 +42,8 @@ public sealed class MainViewModel : ObservableObject
         ITransferService transferService,
         Func<string?> pickFolder,
         Action<IReadOnlyList<IPhoneFileProvider>> onProvidersReady,
-        HotspotUploadServer hotspotUploadServer)
+        HotspotUploadServer hotspotUploadServer,
+        MobileHotspotService mobileHotspotService)
     {
         _deviceManager = deviceManager;
         _diagnosticsService = diagnosticsService;
@@ -47,6 +52,7 @@ public sealed class MainViewModel : ObservableObject
         _pickFolder = pickFolder;
         _onProvidersReady = onProvidersReady;
         _hotspotUploadServer = hotspotUploadServer;
+        _mobileHotspotService = mobileHotspotService;
         _syncContext = SynchronizationContext.Current;
         _hotspotUploadServer.FileReceived += OnHotspotFileReceived;
 
@@ -64,6 +70,10 @@ public sealed class MainViewModel : ObservableObject
         DownloadFilteredCommand = new AsyncRelayCommand(DownloadFilteredAsync, CanDownloadFiltered);
         StartHotspotUploadCommand = new AsyncRelayCommand(StartHotspotUploadAsync, CanStartHotspotUpload);
         StopHotspotUploadCommand = new AsyncRelayCommand(StopHotspotUploadAsync, () => IsHotspotUploadRunning);
+        LoadHotspotConfigCommand = new AsyncRelayCommand(LoadHotspotConfigAsync);
+        ConfigureHotspotNetworkCommand = new AsyncRelayCommand(ConfigureHotspotNetworkAsync);
+        StartHotspotNetworkCommand = new AsyncRelayCommand(StartHotspotNetworkAsync);
+        StopHotspotNetworkCommand = new AsyncRelayCommand(StopHotspotNetworkAsync);
         CancelCommand = new RelayCommand(Cancel, () => IsBusy);
     }
 
@@ -88,6 +98,10 @@ public sealed class MainViewModel : ObservableObject
     public AsyncRelayCommand DownloadFilteredCommand { get; }
     public AsyncRelayCommand StartHotspotUploadCommand { get; }
     public AsyncRelayCommand StopHotspotUploadCommand { get; }
+    public AsyncRelayCommand LoadHotspotConfigCommand { get; }
+    public AsyncRelayCommand ConfigureHotspotNetworkCommand { get; }
+    public AsyncRelayCommand StartHotspotNetworkCommand { get; }
+    public AsyncRelayCommand StopHotspotNetworkCommand { get; }
     public RelayCommand CancelCommand { get; }
 
     #region Bindable state
@@ -124,6 +138,27 @@ public sealed class MainViewModel : ObservableObject
     {
         get => _hotspotUploadStatus;
         private set => SetProperty(ref _hotspotUploadStatus, value);
+    }
+
+    private string _hotspotSsid = DefaultHotspotSsid;
+    public string HotspotSsid
+    {
+        get => _hotspotSsid;
+        set => SetProperty(ref _hotspotSsid, value);
+    }
+
+    private string _hotspotPassphrase = DefaultHotspotPassphrase;
+    public string HotspotPassphrase
+    {
+        get => _hotspotPassphrase;
+        set => SetProperty(ref _hotspotPassphrase, value);
+    }
+
+    private string _hotspotNetworkStatus = "Load config to see current hotspot settings, or enter new ones and apply.";
+    public string HotspotNetworkStatus
+    {
+        get => _hotspotNetworkStatus;
+        private set => SetProperty(ref _hotspotNetworkStatus, value);
     }
 
     private string _hotspotPrimaryUrl = string.Empty;
@@ -294,6 +329,27 @@ public sealed class MainViewModel : ObservableObject
     {
         _hotspotUploadServer.FileReceived -= OnHotspotFileReceived;
         await _hotspotUploadServer.DisposeAsync().ConfigureAwait(false);
+    }
+
+    public async Task ConfigureAndStartDefaultHotspotAsync()
+    {
+        HotspotSsid = DefaultHotspotSsid;
+        HotspotPassphrase = DefaultHotspotPassphrase;
+        HotspotNetworkStatus = "Applying default hotspot configuration...";
+
+        var configureError = await _mobileHotspotService.ConfigureAsync(HotspotSsid, HotspotPassphrase)
+            .ConfigureAwait(true);
+        if (configureError is not null)
+        {
+            HotspotNetworkStatus = $"Failed to configure hotspot: {configureError}";
+            return;
+        }
+
+        HotspotNetworkStatus = "Starting hotspot...";
+        var startError = await _mobileHotspotService.StartAsync().ConfigureAwait(true);
+        HotspotNetworkStatus = startError is null
+            ? $"Hotspot is ON. Connect your iPhone to {HotspotSsid}."
+            : $"Failed to start hotspot: {startError}";
     }
 
     private async Task OpenSelectedSourceAsync()
@@ -561,6 +617,54 @@ public sealed class MainViewModel : ObservableObject
         HotspotUploadUrls.Clear();
         IsHotspotUploadRunning = false;
         HotspotUploadStatus = "Hotspot upload server stopped.";
+    }
+
+    private Task LoadHotspotConfigAsync()
+    {
+        var config = _mobileHotspotService.GetConfiguration();
+        if (config is null)
+        {
+            HotspotNetworkStatus = "Could not read hotspot configuration. No network adapter found.";
+            return Task.CompletedTask;
+        }
+        HotspotSsid = config.Ssid;
+        HotspotPassphrase = config.Passphrase;
+        var state = _mobileHotspotService.GetState();
+        HotspotNetworkStatus = $"Hotspot is currently {state?.ToString()?.ToLowerInvariant() ?? "unknown"}.";
+        return Task.CompletedTask;
+    }
+
+    private async Task ConfigureHotspotNetworkAsync()
+    {
+        if (string.IsNullOrWhiteSpace(HotspotSsid))
+        {
+            HotspotNetworkStatus = "Enter a network name (SSID).";
+            return;
+        }
+        if (HotspotPassphrase.Length < 8)
+        {
+            HotspotNetworkStatus = "Password must be at least 8 characters.";
+            return;
+        }
+        HotspotNetworkStatus = "Applying configuration...";
+        var error = await _mobileHotspotService.ConfigureAsync(HotspotSsid, HotspotPassphrase).ConfigureAwait(true);
+        HotspotNetworkStatus = error is null ? "Configuration applied successfully." : $"Failed: {error}";
+    }
+
+    private async Task StartHotspotNetworkAsync()
+    {
+        HotspotNetworkStatus = "Starting hotspot...";
+        var error = await _mobileHotspotService.StartAsync().ConfigureAwait(true);
+        HotspotNetworkStatus = error is null
+            ? "Hotspot is ON. Connect your iPhone to this network, then start the upload server."
+            : $"Failed to start hotspot: {error}";
+    }
+
+    private async Task StopHotspotNetworkAsync()
+    {
+        HotspotNetworkStatus = "Stopping hotspot...";
+        var error = await _mobileHotspotService.StopAsync().ConfigureAwait(true);
+        HotspotNetworkStatus = error is null ? "Hotspot stopped." : $"Failed to stop hotspot: {error}";
     }
 
     private void OnHotspotFileReceived(object? sender, HotspotUploadReceivedEventArgs e)
