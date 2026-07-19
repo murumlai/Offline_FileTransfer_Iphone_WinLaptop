@@ -104,6 +104,11 @@ public sealed class WpdMediaProvider : IPhoneFileProvider, IDisposable
 
             dynamic items = folder.Items();
             int count = items.Count;
+
+            // Detail column indexes differ across portable devices, so discover them once.
+            var sizeColumn = FindDetailColumn(folder, "Size");
+            var modifiedColumn = FindDetailColumn(folder, "Modified", "Date modified");
+
             for (var i = 0; i < count; i++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -134,8 +139,8 @@ public sealed class WpdMediaProvider : IPhoneFileProvider, IDisposable
                             Source = SourceKind,
                             Extension = FileTypeClassifier.GetExtension(name),
                             Category = FileTypeClassifier.Classify(name),
-                            SizeBytes = ReadSize(folder, entry),
-                            ModifiedUtc = ReadModified(entry),
+                            SizeBytes = ReadSize(folder, entry, sizeColumn),
+                            ModifiedUtc = ReadModified(folder, entry, modifiedColumn),
                         });
                     }
                 }
@@ -214,9 +219,13 @@ public sealed class WpdMediaProvider : IPhoneFileProvider, IDisposable
     {
         var deadline = Environment.TickCount64 + CopyTimeoutMs;
         long lastSize = -1;
+        var stableChecks = 0;
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
+
+            // CopyHere is asynchronous and only advances while this STA thread pumps messages.
+            MessagePump.DoEvents();
 
             if (File.Exists(localPath))
             {
@@ -224,7 +233,15 @@ public sealed class WpdMediaProvider : IPhoneFileProvider, IDisposable
                 // Consider the copy complete once the size stops growing and the file is unlocked.
                 if (size == lastSize && size >= 0 && IsFileReady(localPath))
                 {
-                    return;
+                    // Require two consecutive stable, readable checks to avoid a premature read.
+                    if (++stableChecks >= 2)
+                    {
+                        return;
+                    }
+                }
+                else
+                {
+                    stableChecks = 0;
                 }
 
                 lastSize = size;
@@ -372,12 +389,16 @@ public sealed class WpdMediaProvider : IPhoneFileProvider, IDisposable
         return null;
     }
 
-    private static long? ReadSize(dynamic folder, dynamic entry)
+    private static long? ReadSize(dynamic folder, dynamic entry, int sizeColumn)
     {
+        if (sizeColumn < 0)
+        {
+            return null;
+        }
+
         try
         {
-            // Column 1 is Size in the shell details; portable devices may return a formatted string.
-            string detail = folder.GetDetailsOf(entry, 1);
+            string detail = folder.GetDetailsOf(entry, sizeColumn);
             return ShellSize.Parse(detail);
         }
         catch
@@ -386,22 +407,77 @@ public sealed class WpdMediaProvider : IPhoneFileProvider, IDisposable
         }
     }
 
-    private static DateTimeOffset? ReadModified(dynamic entry)
+    private static DateTimeOffset? ReadModified(dynamic folder, dynamic entry, int modifiedColumn)
     {
         try
         {
             object value = entry.ModifyDate;
-            if (value is DateTime dt)
+            if (value is DateTime dt && dt != default)
             {
                 return new DateTimeOffset(dt);
             }
-
-            return null;
         }
         catch
         {
+            // fall through to column-based parsing
+        }
+
+        if (modifiedColumn < 0)
+        {
             return null;
         }
+
+        try
+        {
+            string detail = folder.GetDetailsOf(entry, modifiedColumn);
+            if (!string.IsNullOrWhiteSpace(detail) &&
+                DateTime.TryParse(detail, out var parsed))
+            {
+                return new DateTimeOffset(parsed);
+            }
+        }
+        catch
+        {
+            // ignore
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Finds the shell detail column index whose header matches one of the given names.
+    /// Column layout varies by device/locale, so this is resolved at runtime. Returns -1 when absent.
+    /// </summary>
+    private static int FindDetailColumn(dynamic folder, params string[] headerNames)
+    {
+        const int maxColumns = 60;
+        for (var i = 0; i < maxColumns; i++)
+        {
+            string header;
+            try
+            {
+                header = folder.GetDetailsOf(null, i);
+            }
+            catch
+            {
+                continue;
+            }
+
+            if (string.IsNullOrWhiteSpace(header))
+            {
+                continue;
+            }
+
+            foreach (var name in headerNames)
+            {
+                if (string.Equals(header.Trim(), name, StringComparison.OrdinalIgnoreCase))
+                {
+                    return i;
+                }
+            }
+        }
+
+        return -1;
     }
 
     private static string ParentOf(string remotePath)
