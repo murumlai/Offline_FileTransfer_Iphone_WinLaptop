@@ -82,8 +82,9 @@ public sealed class WpdDeviceManager : IDeviceManager, IDisposable
 
     private static DeviceTrustState DetermineTrustState(dynamic deviceEntry)
     {
-        // A trusted, unlocked iPhone exposes an enumerable storage folder ("Internal Storage").
-        // A locked or untrusted device shows the node but exposes no browsable storage.
+        // A trusted, unlocked iPhone exposes an enumerable storage folder ("Internal Storage")
+        // that itself contains entries (DCIM, etc.). A locked or permission-denied device shows
+        // the storage node but it stays EMPTY until the phone is unlocked and access is allowed.
         try
         {
             dynamic folder = deviceEntry.GetFolder;
@@ -94,10 +95,43 @@ public sealed class WpdDeviceManager : IDeviceManager, IDisposable
 
             dynamic children = folder.Items();
             int count = children.Count;
+            if (count == 0)
+            {
+                ShellCom.Release(children);
+                ShellCom.Release(folder);
+                return DeviceTrustState.Untrusted;
+            }
+
+            // Peek one level deeper: if any storage folder has content, the phone is unlocked.
+            var hasContent = false;
+            for (var i = 0; i < count && !hasContent; i++)
+            {
+                dynamic storage = children.Item(i);
+                try
+                {
+                    if (storage.IsFolder)
+                    {
+                        dynamic storageFolder = storage.GetFolder;
+                        dynamic grandChildren = storageFolder.Items();
+                        hasContent = grandChildren.Count > 0;
+                        ShellCom.Release(grandChildren);
+                        ShellCom.Release(storageFolder);
+                    }
+                }
+                catch
+                {
+                    // ignore and continue probing other storage nodes
+                }
+                finally
+                {
+                    ShellCom.Release(storage);
+                }
+            }
+
             ShellCom.Release(children);
             ShellCom.Release(folder);
 
-            return count > 0 ? DeviceTrustState.Trusted : DeviceTrustState.Locked;
+            return hasContent ? DeviceTrustState.Trusted : DeviceTrustState.Locked;
         }
         catch
         {

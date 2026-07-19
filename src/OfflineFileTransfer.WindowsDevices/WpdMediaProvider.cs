@@ -41,25 +41,25 @@ public sealed class WpdMediaProvider : IPhoneFileProvider, IDisposable
         return _runner.RunAsync(() =>
         {
             dynamic? shell = null;
-            dynamic? deviceFolder = null;
+            dynamic? storageRoot = null;
             try
             {
                 shell = ShellCom.CreateShell();
-                deviceFolder = ResolveDeviceFolder(shell);
-                if (deviceFolder is null)
+                storageRoot = GetStorageRootFolder(shell);
+                if (storageRoot is null)
                 {
                     return ProviderAvailability.Unavailable(
                         "iPhone not found in This PC. Connect via USB, unlock, and tap Trust.");
                 }
 
-                dynamic items = deviceFolder.Items();
+                dynamic items = storageRoot.Items();
                 int count = items.Count;
                 ShellCom.Release(items);
 
                 return count > 0
                     ? ProviderAvailability.Available()
                     : ProviderAvailability.Unavailable(
-                        "iPhone storage is not readable. Unlock the phone and tap Trust/Allow.");
+                        "iPhone is connected but its storage is empty/locked. Unlock the phone, keep it unlocked, tap Allow/Trust to grant access to photos, then press Refresh.");
             }
             catch (Exception ex)
             {
@@ -67,7 +67,7 @@ public sealed class WpdMediaProvider : IPhoneFileProvider, IDisposable
             }
             finally
             {
-                ShellCom.Release(deviceFolder);
+                ShellCom.Release(storageRoot);
                 ShellCom.Release(shell);
             }
         });
@@ -287,7 +287,7 @@ public sealed class WpdMediaProvider : IPhoneFileProvider, IDisposable
 
     private dynamic? ResolveFolderByPath(dynamic shell, string normalizedPath)
     {
-        dynamic? current = ResolveDeviceFolder(shell);
+        dynamic? current = GetStorageRootFolder(shell);
         if (current is null || string.IsNullOrEmpty(normalizedPath))
         {
             return current;
@@ -308,6 +308,47 @@ public sealed class WpdMediaProvider : IPhoneFileProvider, IDisposable
         }
 
         return current;
+    }
+
+    /// <summary>
+    /// Returns the folder to browse from. iPhones expose a single storage node
+    /// ("Internal Storage") under the device; descend into it so the user sees the
+    /// media folders directly instead of an extra wrapper level.
+    /// </summary>
+    private dynamic? GetStorageRootFolder(dynamic shell)
+    {
+        dynamic? device = ResolveDeviceFolder(shell);
+        if (device is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            dynamic items = device.Items();
+            int count = items.Count;
+            if (count == 1)
+            {
+                dynamic only = items.Item(0);
+                if (only.IsFolder)
+                {
+                    dynamic storage = only.GetFolder;
+                    ShellCom.Release(only);
+                    ShellCom.Release(items);
+                    ShellCom.Release(device);
+                    return storage;
+                }
+
+                ShellCom.Release(only);
+            }
+
+            ShellCom.Release(items);
+            return device;
+        }
+        catch
+        {
+            return device;
+        }
     }
 
     private static dynamic? FindChild(dynamic folder, string name)
