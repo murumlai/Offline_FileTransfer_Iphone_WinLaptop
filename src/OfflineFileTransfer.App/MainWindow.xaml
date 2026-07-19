@@ -57,8 +57,18 @@
 
                 <StackPanel Grid.Column="0">
                     <TextBlock Text="Hotspot browser upload" Style="{StaticResource Heading}" />
-                    <TextBlock Text="Uses the destination folder below. Put both devices on the same hotspot, then open the URL in Safari on the iPhone."
+                    <TextBlock Text="No USB detection is needed. Put both devices on the same hotspot, start the server, then open the URL in Safari on the iPhone."
                                TextWrapping="Wrap" />
+                    <Grid Margin="0,6,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Content="Destination..."
+                                Command="{Binding PickDestinationCommand}" Padding="8,4" />
+                        <TextBox Grid.Column="1" Text="{Binding DestinationFolder, Mode=OneWay}"
+                                 IsReadOnly="True" Margin="8,0,0,0" VerticalContentAlignment="Center" />
+                    </Grid>
                     <TextBox Text="{Binding HotspotPrimaryUrl, Mode=OneWay}" IsReadOnly="True"
                              Margin="0,6,0,0" VerticalContentAlignment="Center" />
                     <ItemsControl ItemsSource="{Binding HotspotUploadUrls}" Margin="0,4,0,0">

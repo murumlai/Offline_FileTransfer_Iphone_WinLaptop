@@ -105,7 +105,7 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
-    private string _deviceStatus = "No device detected. Connect an iPhone over USB.";
+    private string _deviceStatus = "No iPhone detected over USB. USB browsing needs a cable; hotspot upload does not.";
     public string DeviceStatus
     {
         get => _deviceStatus;
@@ -249,8 +249,8 @@ public sealed class MainViewModel : ObservableObject
 
             if (_device is null)
             {
-                DeviceStatus = "No iPhone detected. Connect it via USB, unlock, and tap Trust.";
-                StatusMessage = "No device.";
+                DeviceStatus = "No iPhone detected over USB. Use a cable for USB browsing, or use hotspot upload without USB.";
+                StatusMessage = "No USB device.";
                 return;
             }
 
@@ -511,15 +511,20 @@ public sealed class MainViewModel : ObservableObject
         DownloadAsync(Files.Select(f => f.Model).ToList());
 
     private bool CanStartHotspotUpload() =>
-        !IsHotspotUploadRunning &&
-        !string.IsNullOrWhiteSpace(DestinationFolder);
+        !IsHotspotUploadRunning;
 
     private async Task StartHotspotUploadAsync()
     {
         if (string.IsNullOrWhiteSpace(DestinationFolder))
         {
-            HotspotUploadStatus = "Choose a destination folder before starting hotspot upload.";
-            return;
+            var picked = _pickFolder();
+            if (string.IsNullOrWhiteSpace(picked))
+            {
+                HotspotUploadStatus = "Choose a Windows folder to receive iPhone uploads.";
+                return;
+            }
+
+            DestinationFolder = picked;
         }
 
         try
