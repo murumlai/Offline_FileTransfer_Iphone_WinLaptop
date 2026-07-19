@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.IO;
 using OfflineFileTransfer.App.Mvvm;
+using OfflineFileTransfer.App.Services;
 using OfflineFileTransfer.Core.Diagnostics;
 using OfflineFileTransfer.Core.Filtering;
 using OfflineFileTransfer.Core.Models;
@@ -20,12 +21,15 @@ public sealed class MainViewModel : ObservableObject
     private readonly ITransferService _transferService;
     private readonly Func<string?> _pickFolder;
     private readonly Action<IReadOnlyList<IPhoneFileProvider>> _onProvidersReady;
+    private readonly HotspotUploadServer _hotspotUploadServer;
+    private readonly SynchronizationContext? _syncContext;
 
     private readonly List<RemoteFileItem> _currentFolderFiles = new();
     private readonly Stack<string> _pathStack = new();
 
     private DeviceInfo? _device;
     private CancellationTokenSource? _cts;
+    private HotspotUploadSession? _hotspotSession;
 
     public MainViewModel(
         IDeviceManager deviceManager,
@@ -33,7 +37,8 @@ public sealed class MainViewModel : ObservableObject
         Func<DeviceInfo, IReadOnlyList<IPhoneFileProvider>> providerFactory,
         ITransferService transferService,
         Func<string?> pickFolder,
-        Action<IReadOnlyList<IPhoneFileProvider>> onProvidersReady)
+        Action<IReadOnlyList<IPhoneFileProvider>> onProvidersReady,
+        HotspotUploadServer hotspotUploadServer)
     {
         _deviceManager = deviceManager;
         _diagnosticsService = diagnosticsService;
@@ -41,6 +46,9 @@ public sealed class MainViewModel : ObservableObject
         _transferService = transferService;
         _pickFolder = pickFolder;
         _onProvidersReady = onProvidersReady;
+        _hotspotUploadServer = hotspotUploadServer;
+        _syncContext = SynchronizationContext.Current;
+        _hotspotUploadServer.FileReceived += OnHotspotFileReceived;
 
         RefreshCommand = new AsyncRelayCommand(RefreshAsync, () => !IsBusy);
         RunDiagnosticsCommand = new AsyncRelayCommand(RunDiagnosticsAsync, () => !IsBusy);
@@ -54,6 +62,8 @@ public sealed class MainViewModel : ObservableObject
         PickDestinationCommand = new RelayCommand(PickDestination);
         DownloadSelectedCommand = new AsyncRelayCommand(DownloadSelectedAsync, CanDownload);
         DownloadFilteredCommand = new AsyncRelayCommand(DownloadFilteredAsync, CanDownloadFiltered);
+        StartHotspotUploadCommand = new AsyncRelayCommand(StartHotspotUploadAsync, CanStartHotspotUpload);
+        StopHotspotUploadCommand = new AsyncRelayCommand(StopHotspotUploadAsync, () => IsHotspotUploadRunning);
         CancelCommand = new RelayCommand(Cancel, () => IsBusy);
     }
 
@@ -61,6 +71,8 @@ public sealed class MainViewModel : ObservableObject
     public ObservableCollection<RemoteFolderItem> Folders { get; } = new();
     public ObservableCollection<FileItemViewModel> Files { get; } = new();
     public ObservableCollection<DiagnosticCheck> Diagnostics { get; } = new();
+    public ObservableCollection<string> HotspotUploadUrls { get; } = new();
+    public ObservableCollection<HotspotUploadReceivedFile> HotspotReceivedFiles { get; } = new();
 
     public AsyncRelayCommand RefreshCommand { get; }
     public AsyncRelayCommand RunDiagnosticsCommand { get; }
@@ -74,6 +86,8 @@ public sealed class MainViewModel : ObservableObject
     public RelayCommand PickDestinationCommand { get; }
     public AsyncRelayCommand DownloadSelectedCommand { get; }
     public AsyncRelayCommand DownloadFilteredCommand { get; }
+    public AsyncRelayCommand StartHotspotUploadCommand { get; }
+    public AsyncRelayCommand StopHotspotUploadCommand { get; }
     public RelayCommand CancelCommand { get; }
 
     #region Bindable state
@@ -103,6 +117,33 @@ public sealed class MainViewModel : ObservableObject
     {
         get => _statusMessage;
         private set => SetProperty(ref _statusMessage, value);
+    }
+
+    private string _hotspotUploadStatus = "Choose a destination folder, start the hotspot upload server, then open the URL on the iPhone.";
+    public string HotspotUploadStatus
+    {
+        get => _hotspotUploadStatus;
+        private set => SetProperty(ref _hotspotUploadStatus, value);
+    }
+
+    private string _hotspotPrimaryUrl = string.Empty;
+    public string HotspotPrimaryUrl
+    {
+        get => _hotspotPrimaryUrl;
+        private set => SetProperty(ref _hotspotPrimaryUrl, value);
+    }
+
+    private bool _isHotspotUploadRunning;
+    public bool IsHotspotUploadRunning
+    {
+        get => _isHotspotUploadRunning;
+        private set
+        {
+            if (SetProperty(ref _isHotspotUploadRunning, value))
+            {
+                RaiseCommandStates();
+            }
+        }
     }
 
     private string _currentPathDisplay = "";
@@ -247,6 +288,12 @@ public sealed class MainViewModel : ObservableObject
                 ? "Diagnostics complete. Camera Roll is supported."
                 : "Diagnostics complete. Camera Roll not confirmed.";
         }).ConfigureAwait(true);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _hotspotUploadServer.FileReceived -= OnHotspotFileReceived;
+        await _hotspotUploadServer.DisposeAsync().ConfigureAwait(false);
     }
 
     private async Task OpenSelectedSourceAsync()
@@ -462,6 +509,71 @@ public sealed class MainViewModel : ObservableObject
 
     private Task DownloadFilteredAsync() =>
         DownloadAsync(Files.Select(f => f.Model).ToList());
+
+    private bool CanStartHotspotUpload() =>
+        !IsHotspotUploadRunning &&
+        !string.IsNullOrWhiteSpace(DestinationFolder);
+
+    private async Task StartHotspotUploadAsync()
+    {
+        if (string.IsNullOrWhiteSpace(DestinationFolder))
+        {
+            HotspotUploadStatus = "Choose a destination folder before starting hotspot upload.";
+            return;
+        }
+
+        try
+        {
+            HotspotUploadStatus = "Starting hotspot upload server...";
+            _hotspotSession = await _hotspotUploadServer.StartAsync(DestinationFolder!)
+                .ConfigureAwait(true);
+
+            HotspotUploadUrls.Clear();
+            foreach (var url in _hotspotSession.UploadUrls)
+            {
+                HotspotUploadUrls.Add(url);
+            }
+
+            HotspotPrimaryUrl = _hotspotSession.PrimaryUrl;
+            IsHotspotUploadRunning = true;
+            HotspotUploadStatus = "Server running. Open the URL on the iPhone while both devices are on the same hotspot.";
+        }
+        catch (Exception ex)
+        {
+            _hotspotSession = null;
+            HotspotPrimaryUrl = string.Empty;
+            HotspotUploadUrls.Clear();
+            IsHotspotUploadRunning = false;
+            HotspotUploadStatus = $"Could not start hotspot upload: {ex.Message}";
+        }
+    }
+
+    private async Task StopHotspotUploadAsync()
+    {
+        await _hotspotUploadServer.StopAsync().ConfigureAwait(true);
+        _hotspotSession = null;
+        HotspotPrimaryUrl = string.Empty;
+        HotspotUploadUrls.Clear();
+        IsHotspotUploadRunning = false;
+        HotspotUploadStatus = "Hotspot upload server stopped.";
+    }
+
+    private void OnHotspotFileReceived(object? sender, HotspotUploadReceivedEventArgs e)
+    {
+        void ApplyReceivedFile()
+        {
+            HotspotReceivedFiles.Insert(0, e.File);
+            HotspotUploadStatus = $"Received {e.File.FileName}.";
+        }
+
+        if (_syncContext is null)
+        {
+            ApplyReceivedFile();
+            return;
+        }
+
+        _syncContext.Post(_ => ApplyReceivedFile(), null);
+    }
 
     private async Task DownloadAsync(IReadOnlyList<RemoteFileItem> items)
     {

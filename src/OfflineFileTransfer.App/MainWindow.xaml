@@ -6,7 +6,7 @@
         xmlns:local="clr-namespace:OfflineFileTransfer.App"
         xmlns:vm="clr-namespace:OfflineFileTransfer.App.ViewModels"
         mc:Ignorable="d"
-        Title="Offline iPhone USB Transfer" Height="720" Width="1180"
+        Title="Offline iPhone USB Transfer" Height="760" Width="1180"
         MinHeight="560" MinWidth="960">
     <Window.Resources>
         <local:StatusToBrushConverter x:Key="StatusToBrush" />
@@ -18,6 +18,7 @@
 
     <Grid Margin="12">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
@@ -44,8 +45,53 @@
             </Grid>
         </Border>
 
+        <!-- Hotspot browser upload -->
+        <Border Grid.Row="1" Padding="10" Margin="0,0,0,10"
+                Background="#EFF6FF" CornerRadius="6">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="2*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="Hotspot browser upload" Style="{StaticResource Heading}" />
+                    <TextBlock Text="Uses the destination folder below. Put both devices on the same hotspot, then open the URL in Safari on the iPhone."
+                               TextWrapping="Wrap" />
+                    <TextBox Text="{Binding HotspotPrimaryUrl}" IsReadOnly="True"
+                             Margin="0,6,0,0" VerticalContentAlignment="Center" />
+                    <ItemsControl ItemsSource="{Binding HotspotUploadUrls}" Margin="0,4,0,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding}" FontSize="11" Foreground="#1D4ED8"
+                                           TextWrapping="Wrap" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Text="{Binding HotspotUploadStatus}" Margin="0,4,0,0"
+                               Foreground="#1F2937" TextWrapping="Wrap" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Margin="12,0">
+                    <TextBlock Text="Received files" Style="{StaticResource Heading}" />
+                    <ListBox Height="82" ItemsSource="{Binding HotspotReceivedFiles}"
+                             DisplayMemberPath="FileName" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="2" Orientation="Vertical" VerticalAlignment="Center">
+                    <Button Content="Start upload server"
+                            Command="{Binding StartHotspotUploadCommand}"
+                            Width="150" Padding="8,4" />
+                    <Button Content="Stop server"
+                            Command="{Binding StopHotspotUploadCommand}"
+                            Width="150" Margin="0,6,0,0" Padding="8,4" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
         <!-- Body -->
-        <Grid Grid.Row="1">
+        <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="240" />
                 <ColumnDefinition Width="260" />
@@ -179,7 +225,7 @@
         </Grid>
 
         <!-- Footer: destination + transfer -->
-        <Border Grid.Row="2" Padding="10" Margin="0,10,0,0"
+        <Border Grid.Row="3" Padding="10" Margin="0,10,0,0"
                 Background="#F3F4F6" CornerRadius="6">
             <Grid>
                 <Grid.RowDefinitions>

@@ -22,6 +22,7 @@ public partial class MainWindow : Window
         var deviceManager = new WpdDeviceManager();
         var diagnostics = new WpdDiagnosticsService(deviceManager);
         var transferService = new FileTransferService(registry.Resolve);
+        var hotspotUploadServer = new HotspotUploadServer();
 
         var viewModel = new MainViewModel(
             deviceManager,
@@ -29,11 +30,13 @@ public partial class MainWindow : Window
             BuildProviders,
             transferService,
             FolderPicker.Pick,
-            providers => registry.Set(providers));
+            providers => registry.Set(providers),
+            hotspotUploadServer);
 
         DataContext = viewModel;
 
         Loaded += async (_, _) => await viewModel.RefreshAsync();
+        Closed += async (_, _) => await viewModel.DisposeAsync();
     }
 
     private static IReadOnlyList<IPhoneFileProvider> BuildProviders(DeviceInfo device)

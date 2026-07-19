@@ -4,6 +4,10 @@ A Windows desktop tool for USB-only iPhone media transfer with **no app installe
 iPhone**. It imports camera-roll photos and videos over USB using Windows Portable Devices,
 with filtering, browsing, and reliable downloads.
 
+It also includes a browser-based hotspot upload mode: the Windows app starts a temporary
+local web page, the iPhone opens it in Safari while both devices are on the same hotspot,
+and selected iPhone files upload directly into the chosen Windows destination folder.
+
 > See [docs/ios-usb-access.md](docs/ios-usb-access.md) for exactly which iPhone storage
 > surfaces are reachable over USB and why. Camera Roll is the supported baseline; the Files
 > app `Downloads` folder is **not** reachable over USB without an iOS app and is shown as
@@ -19,6 +23,8 @@ with filtering, browsing, and reliable downloads.
 - Download selected files or all filtered files to a Windows folder.
 - Preserve folder structure, choose duplicate handling (skip / overwrite / auto-rename),
   progress, and cancellation.
+- Receive files from an iPhone over a laptop-created or iPhone-created hotspot through
+    Safari, with no internet connection or iPhone app install.
 
 ## Projects
 
@@ -49,6 +55,19 @@ dotnet test tests/OfflineFileTransfer.Core.Tests/OfflineFileTransfer.Core.Tests.
 ```powershell
 dotnet run --project src/OfflineFileTransfer.App/OfflineFileTransfer.App.csproj
 ```
+
+## Hotspot browser upload
+
+1. Connect the Windows laptop and iPhone to the same hotspot. Either device can create it.
+2. In the Windows app, choose a destination folder.
+3. Select **Start upload server** in the Hotspot browser upload panel.
+4. If Windows Firewall prompts, allow access on private networks.
+5. Open one of the shown `http://...` URLs in Safari on the iPhone.
+6. Choose files and upload them. Received files appear in the app and are saved to the
+    selected destination folder.
+
+This mode is intentionally browser-based. The Windows app receives files the user selects
+on the iPhone; it does not browse the iPhone filesystem over Wi-Fi.
 
 ## Publish a self-contained app
 
