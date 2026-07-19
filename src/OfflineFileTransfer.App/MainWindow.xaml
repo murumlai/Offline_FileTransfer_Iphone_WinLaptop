@@ -59,7 +59,7 @@
                     <TextBlock Text="Hotspot browser upload" Style="{StaticResource Heading}" />
                     <TextBlock Text="Uses the destination folder below. Put both devices on the same hotspot, then open the URL in Safari on the iPhone."
                                TextWrapping="Wrap" />
-                    <TextBox Text="{Binding HotspotPrimaryUrl}" IsReadOnly="True"
+                    <TextBox Text="{Binding HotspotPrimaryUrl, Mode=OneWay}" IsReadOnly="True"
                              Margin="0,6,0,0" VerticalContentAlignment="Center" />
                     <ItemsControl ItemsSource="{Binding HotspotUploadUrls}" Margin="0,4,0,0">
                         <ItemsControl.ItemTemplate>
