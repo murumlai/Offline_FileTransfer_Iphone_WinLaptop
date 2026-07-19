@@ -166,8 +166,10 @@
                         <DataGridTextColumn Header="Type" Width="90" IsReadOnly="True"
                                             Binding="{Binding Category}" />
                         <DataGridTextColumn Header="Size" Width="90" IsReadOnly="True"
+                                            SortMemberPath="SizeSortKey"
                                             Binding="{Binding SizeDisplay}" />
                         <DataGridTextColumn Header="Modified" Width="130" IsReadOnly="True"
+                                            SortMemberPath="ModifiedSortKey"
                                             Binding="{Binding ModifiedDisplay}" />
                         <DataGridTextColumn Header="Source" Width="110" IsReadOnly="True"
                                             Binding="{Binding SourceDisplay}" />

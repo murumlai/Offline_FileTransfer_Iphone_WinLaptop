@@ -23,7 +23,13 @@ public sealed class FileItemViewModel : ObservableObject
 
     public string SizeDisplay => DisplayFormat.Bytes(Model.SizeBytes);
 
+    /// <summary>Numeric size used for sorting; unknown sizes sort as -1.</summary>
+    public long SizeSortKey => Model.SizeBytes ?? -1;
+
     public string ModifiedDisplay => DisplayFormat.Date(Model.ModifiedUtc);
+
+    /// <summary>Sortable modified timestamp; unknown dates sort first.</summary>
+    public DateTimeOffset ModifiedSortKey => Model.ModifiedUtc ?? DateTimeOffset.MinValue;
 
     public string SourceDisplay => Model.Source.ToString();
 
