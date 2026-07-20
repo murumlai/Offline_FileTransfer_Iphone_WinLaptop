@@ -1,5 +1,7 @@
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Windows;
+using System.Windows.Media;
 using OfflineFileTransfer.App.Mvvm;
 using OfflineFileTransfer.App.Services;
 using OfflineFileTransfer.Core.Diagnostics;
@@ -7,6 +9,7 @@ using OfflineFileTransfer.Core.Filtering;
 using OfflineFileTransfer.Core.Models;
 using OfflineFileTransfer.Core.Providers;
 using OfflineFileTransfer.Core.Transfers;
+using QRCoder;
 
 namespace OfflineFileTransfer.App.ViewModels;
 
@@ -165,7 +168,20 @@ public sealed class MainViewModel : ObservableObject
     public string HotspotPrimaryUrl
     {
         get => _hotspotPrimaryUrl;
-        private set => SetProperty(ref _hotspotPrimaryUrl, value);
+        private set
+        {
+            if (SetProperty(ref _hotspotPrimaryUrl, value))
+            {
+                HotspotQrCode = CreateQrCodeImage(value);
+            }
+        }
+    }
+
+    private ImageSource? _hotspotQrCode;
+    public ImageSource? HotspotQrCode
+    {
+        get => _hotspotQrCode;
+        private set => SetProperty(ref _hotspotQrCode, value);
     }
 
     private bool _isHotspotUploadRunning;
@@ -667,6 +683,43 @@ public sealed class MainViewModel : ObservableObject
         HotspotNetworkStatus = error is null ? "Hotspot stopped." : $"Failed to stop hotspot: {error}";
     }
 
+    private static ImageSource? CreateQrCodeImage(string payload)
+    {
+        if (string.IsNullOrWhiteSpace(payload))
+        {
+            return null;
+        }
+
+        using var generator = new QRCodeGenerator();
+        using var data = generator.CreateQrCode(payload, QRCodeGenerator.ECCLevel.Q);
+        const int quietZoneModules = 4;
+        var moduleCount = data.ModuleMatrix.Count;
+        var imageSize = moduleCount + quietZoneModules * 2;
+        var drawing = new DrawingGroup();
+
+        using (var context = drawing.Open())
+        {
+            context.DrawRectangle(Brushes.White, null, new Rect(0, 0, imageSize, imageSize));
+
+            for (var y = 0; y < moduleCount; y++)
+            {
+                var row = data.ModuleMatrix[y];
+                for (var x = 0; x < row.Length; x++)
+                {
+                    if (row[x])
+                    {
+                        context.DrawRectangle(Brushes.Black, null, new Rect(x + quietZoneModules, y + quietZoneModules, 1, 1));
+                    }
+                }
+            }
+        }
+
+        drawing.Freeze();
+        var image = new DrawingImage(drawing);
+        image.Freeze();
+        return image;
+    }
+
     private void OnHotspotFileReceived(object? sender, HotspotUploadReceivedEventArgs e)
     {
         void ApplyReceivedFile()
@@ -768,6 +821,8 @@ public sealed class MainViewModel : ObservableObject
         ClearFilterCommand.RaiseCanExecuteChanged();
         DownloadSelectedCommand.RaiseCanExecuteChanged();
         DownloadFilteredCommand.RaiseCanExecuteChanged();
+        StartHotspotUploadCommand.RaiseCanExecuteChanged();
+        StopHotspotUploadCommand.RaiseCanExecuteChanged();
         CancelCommand.RaiseCanExecuteChanged();
     }
 }

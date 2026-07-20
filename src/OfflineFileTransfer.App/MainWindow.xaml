@@ -129,8 +129,14 @@
                     </StackPanel>
 
                     <StackPanel Grid.Column="1" Margin="12,0">
-                        <TextBlock Text="Received files" Style="{StaticResource Heading}" />
-                        <ListBox Height="82" ItemsSource="{Binding HotspotReceivedFiles}"
+                        <TextBlock Text="Scan URL" Style="{StaticResource Heading}" />
+                        <Border Width="132" Height="132" Background="White" BorderBrush="#CBD5E1"
+                                BorderThickness="1" Padding="6" HorizontalAlignment="Left">
+                            <Image Source="{Binding HotspotQrCode}" Width="120" Height="120" Stretch="Uniform"
+                                   RenderOptions.BitmapScalingMode="NearestNeighbor" />
+                        </Border>
+                        <TextBlock Text="Received files" Style="{StaticResource Heading}" Margin="0,8,0,4" />
+                        <ListBox Height="54" ItemsSource="{Binding HotspotReceivedFiles}"
                                  DisplayMemberPath="FileName" />
                     </StackPanel>
 

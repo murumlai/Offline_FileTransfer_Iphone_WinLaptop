@@ -156,24 +156,71 @@ public sealed class HotspotUploadServer : IAsyncDisposable
 
     private static IReadOnlyList<string> BuildUploadUrls(int port, string token)
     {
-        var addresses = NetworkInterface.GetAllNetworkInterfaces()
+        var candidates = NetworkInterface.GetAllNetworkInterfaces()
             .Where(n => n.OperationalStatus == OperationalStatus.Up)
             .Where(n => n.NetworkInterfaceType is not NetworkInterfaceType.Loopback and not NetworkInterfaceType.Tunnel)
-            .SelectMany(n => n.GetIPProperties().UnicastAddresses)
-            .Select(a => a.Address)
-            .Where(a => a.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(a))
-            .Select(a => $"http://{a}:{port}/{token}")
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(url => url, StringComparer.OrdinalIgnoreCase)
+            .SelectMany(n => n.GetIPProperties().UnicastAddresses
+                .Where(a => a.Address.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(a.Address))
+                .Select(a => new UploadUrlCandidate(
+                    $"http://{a.Address}:{port}/{token}",
+                    ScoreUploadAddress(n, a))))
+            .GroupBy(candidate => candidate.Url, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.OrderByDescending(candidate => candidate.Score).First())
+            .OrderByDescending(candidate => candidate.Score)
+            .ThenBy(candidate => candidate.Url, StringComparer.OrdinalIgnoreCase)
+            .Select(candidate => candidate.Url)
             .ToList();
 
-        if (addresses.Count == 0)
+        if (candidates.Count == 0)
         {
-            addresses.Add($"http://localhost:{port}/{token}");
+            candidates.Add($"http://localhost:{port}/{token}");
         }
 
-        return addresses;
+        return candidates;
     }
+
+    private static int ScoreUploadAddress(NetworkInterface networkInterface, UnicastIPAddressInformation address)
+    {
+        var score = 0;
+
+        if (networkInterface.NetworkInterfaceType == NetworkInterfaceType.Wireless80211)
+        {
+            score += 100;
+        }
+
+        if (!IsIPv4LinkLocal(address.Address))
+        {
+            score += 40;
+        }
+
+        if (IsPrivateIPv4(address.Address))
+        {
+            score += 20;
+        }
+
+        if (address.PrefixLength is > 0 and < 32)
+        {
+            score += 10;
+        }
+
+        return score;
+    }
+
+    private static bool IsIPv4LinkLocal(IPAddress address)
+    {
+        var bytes = address.GetAddressBytes();
+        return bytes[0] == 169 && bytes[1] == 254;
+    }
+
+    private static bool IsPrivateIPv4(IPAddress address)
+    {
+        var bytes = address.GetAddressBytes();
+        return bytes[0] == 10
+            || (bytes[0] == 172 && bytes[1] is >= 16 and <= 31)
+            || (bytes[0] == 192 && bytes[1] == 168);
+    }
+
+    private sealed record UploadUrlCandidate(string Url, int Score);
 
     private static void TryDeletePartial(string path)
     {
